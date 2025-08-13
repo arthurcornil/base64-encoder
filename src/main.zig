@@ -13,71 +13,30 @@ const Base64 = struct {
         };
     }
 
-    fn get_nth_digit(self: Base64, n: usize) u8 {
-        return self.table[n];
-    }
-    
     pub fn encode(self: Base64, input: []const u8, allocator: std.mem.Allocator) ![]u8 {
-        const output_len = try get_output_len(input);
-        const output: []u8 = try allocator.alloc(u8, output_len);
-        var byte_counter: u64 = 0;
-        var buffer = [3]u8{ 0, 0, 0 };
-        var output_index: u64 = 0;
-        var n: u8 = 0;
-        
-        for (input) |byte| {
-            buffer[byte_counter] = byte;
-            byte_counter += 1;
-            if (byte_counter == 1) {
-                n = buffer[0] >> 2;
-                output[output_index] = self.get_nth_digit(n);
-                output_index += 1;
-            }
-            if (byte_counter < 3)
-                continue ;
-            byte_counter = 0;
-            n = ((buffer[0] & 3) << 4) | (buffer[1] >> 4);
-            output[output_index] = self.get_nth_digit(n);
-            output_index += 1;
-            n = ((buffer[1] & 15) << 2) | (buffer[2] >> 6);
-            output[output_index] = self.get_nth_digit(n);
-            output_index += 1;
-            n = buffer[2] & 63;
-            output[output_index] = self.get_nth_digit(n);
-            output_index += 1;
-        }
-        if (byte_counter == 2) {
-            n = ((buffer[0] & 3) << 4) | (buffer[1] >> 4);
-            output[output_index] = self.get_nth_digit(n);
-            n = (buffer[1] & 15) << 2;
-            output_index += 1;
-            output[output_index] = self.get_nth_digit(n);
-            output_index += 1;
-            output[output_index] = '=';
-        }
-        else if (byte_counter == 1) {
-            n = (buffer[0] & 3) << 4;
-            output[output_index] = self.get_nth_digit(n);
-            output_index += 1;
-            output[output_index] = '=';
-            output_index += 1;
-            output[output_index] = '=';
+        const output_len = ((input.len + 2) / 3) * 4;
+        var output = try allocator.alloc(u8, output_len);
+        var i: usize = 0;
+        var j: usize = 0;
+
+        while (i < input.len) : (i += 3) {
+            const b0 = input[i];
+            const b1 = if (i + 1 < input.len) input[i + 1] else 0;
+            const b2 = if (i + 2 < input.len) input[i + 2] else 0;
+
+            output[j] = self.table[b0 >> 2];
+            output[j+1] = self.table[((b0 & 0x03) << 4) | (b1 >> 4)];
+            output[j+2] = if (i + 1 < input.len) self.table[((b1 & 0x0F) << 2) | (b2 >> 6)] else '=';
+            output[j+3] = if (i + 2 < input.len) self.table[b2 & 0x3F] else '=';
+            j += 4;
         }
         return output;
     }
 };
 
-fn get_output_len(str: []const u8) !usize {
-    if (str.len <= 3)
-        return @as(usize, 4);
-    var num_bytes: usize = try std.math.divCeil(usize, str.len, 3);
-    num_bytes *= 4;
-    return num_bytes;
-}
-
 pub fn main() !void {
     const base64 = Base64.init();
-    const input = "hello, world!";
+    const input = "hel";
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     const output: []u8 = try base64.encode(input, allocator);
