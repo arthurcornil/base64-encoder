@@ -81,6 +81,7 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     const output: []u8 = try base64.encode(input, allocator);
+    defer allocator.free(output);
 
     print("{s}\n", .{output});
 }
